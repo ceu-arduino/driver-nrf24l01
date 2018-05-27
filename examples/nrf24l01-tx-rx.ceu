@@ -12,9 +12,15 @@
 #include "spi.ceu"
 #include "nrf24l01.ceu"
 
-{Serial.begin(9600);}
-{Serial.println("Ceu - nrf-tx-seq");}
-{_DELAY(20);}
+#include "usart.ceu"
+#include "string.ceu"
+spawn Usart(9600);
+var[20] byte str = [] .. "Ceu - nrf-tx-rx\n\r";
+await Usart_TX(&str);
+//{Serial.begin(9600);}
+//{_DELAY(2000);}
+//{Serial.println("Ceu - nrf-tx-rx");}
+//{_DELAY(20);}
 
 var Lock spi = _;
 spawn Spi();
@@ -33,12 +39,22 @@ loop i do
         do
             var[1] byte buf = [i];
             await Nrf24l01_TX(&nrf, &buf);
-            {Serial.print("< "); Serial.println(@buf[0]); _DELAY(10);}
+
+            str = [] .. "< ";
+            call String_Append_INT(&str, buf[0], _);
+            call String_Append_STR(&str, "\n\r");
+            await Usart_TX(&str);
+            //{Serial.print("< "); Serial.println(@buf[0]); _DELAY(10);}
         end
         do
             var[1] byte buf = [];
             await Nrf24l01_RX(&nrf, &buf);
-            {Serial.print("> "); Serial.println(@buf[0]); _DELAY(10);}
+
+            str = [] .. "> ";
+            call String_Append_INT(&str, buf[0], _);
+            call String_Append_STR(&str, "\n\r");
+            await Usart_TX(&str);
+            //{Serial.print("> "); Serial.println(@buf[0]); _DELAY(10);}
         end
         await FOREVER;
     end
