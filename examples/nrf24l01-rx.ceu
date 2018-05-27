@@ -1,0 +1,34 @@
+#include "wdt.ceu"
+#include "gpio.ceu"
+
+#ifdef ARDUINO_BOARD_MEGA
+#include "pin_10.ceu"
+#define IRQ 10
+#else
+#include "pin_02.ceu"
+#define IRQ 2
+#endif
+
+#include "spi.ceu"
+#include "nrf24l01.ceu"
+
+{Serial.begin(9600);}
+{Serial.println("Ceu - nrf-rx");}
+{_DELAY(20);}
+
+var Lock spi = _;
+spawn Spi();
+
+var Nrf24l01_ nrf = val Nrf24l01_(&spi, IRQ, 8,7, _,_,_,_,_,_,_);
+spawn Nrf24l01(&nrf);
+await nrf.ok;
+
+output on/off PIN_13;
+
+var int i;
+loop i do
+    emit PIN_13(((i+1) % 2) as on/off);
+    var[1] byte buf = [];
+    await Nrf24l01_RX(&nrf, &buf);
+    {Serial.print("> "); Serial.println(@buf[0]); _DELAY(10);}
+end
