@@ -1,31 +1,24 @@
 #include "wdt.ceu"
-#include "gpio.ceu"
-
-#ifdef ARDUINO_BOARD_MEGA
-#include "pin_10.ceu"
-#define IRQ 10
-#else
-#include "pin_02.ceu"
-#define IRQ 2
-#endif
-
+#include "out.ceu"
+#include "int0.ceu"
 #include "spi.ceu"
+
+#define NRF24L01_IRQ INT0
 #include "nrf24l01.ceu"
 
 #include "usart.ceu"
 #include "string.ceu"
-spawn Usart(9600);
+spawn USART_Init(9600);
 var[20] byte str = [] .. "Ceu - nrf-tx-rx\n\r";
-await Usart_TX(&str);
+await USART_Tx(&str);
 //{Serial.begin(9600);}
 //{_DELAY(2000);}
 //{Serial.println("Ceu - nrf-tx-rx");}
 //{_DELAY(20);}
 
 var Lock spi = _;
-spawn Spi();
 
-var Nrf24l01_ nrf = val Nrf24l01_(&spi, IRQ, 8,7, _,_,_,_,_,_,_);
+var Nrf24l01_ nrf = val Nrf24l01_(&spi, 8,7, _,_,_,_,_,_,_);
 spawn Nrf24l01(&nrf);
 await nrf.ok;
 
@@ -43,7 +36,7 @@ loop i do
             str = [] .. "< ";
             call String_Append_INT(&str, buf[0], _);
             call String_Append_STR(&str, "\n\r");
-            await Usart_TX(&str);
+            await USART_Tx(&str);
             //{Serial.print("< "); Serial.println(@buf[0]); _DELAY(10);}
         end
         do
@@ -53,7 +46,7 @@ loop i do
             str = [] .. "> ";
             call String_Append_INT(&str, buf[0], _);
             call String_Append_STR(&str, "\n\r");
-            await Usart_TX(&str);
+            await USART_Tx(&str);
             //{Serial.print("> "); Serial.println(@buf[0]); _DELAY(10);}
         end
         await FOREVER;

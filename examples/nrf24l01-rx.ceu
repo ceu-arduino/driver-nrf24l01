@@ -1,15 +1,8 @@
+#include "int0.ceu"
 #include "wdt.ceu"
-#include "gpio.ceu"
-
-#ifdef ARDUINO_BOARD_MEGA
-#include "pin_10.ceu"
-#define IRQ 10
-#else
-#include "pin_02.ceu"
-#define IRQ 2
-#endif
-
 #include "spi.ceu"
+
+#define NRF24L01_IRQ INT0
 #include "nrf24l01.ceu"
 
 {Serial.begin(9600);}
@@ -17,9 +10,8 @@
 {_DELAY(20);}
 
 var Lock spi = _;
-spawn Spi();
 
-var Nrf24l01_ nrf = val Nrf24l01_(&spi, IRQ, 8,7, _,_,_,_,_,_,_);
+var Nrf24l01_ nrf = val Nrf24l01_(&spi, 8,7, _,_,_,_,_,_,_);
 spawn Nrf24l01(&nrf);
 await nrf.ok;
 

@@ -2,9 +2,12 @@
 // EXTERNAL INTERFACE
 ///////////////////////////////////////////////////////////////////////////////
 
+#ifndef NRF24L01_IRQ
+#error Missing interrupt pin `NRF24L01_IRQ`.
+#endif
+
 data Nrf24l01_ with
     var&   Lock spi;
-    var    int  irq;
     var    int  ce;
     var    int  csn;
     var    u8   payload_size = 32;
@@ -245,8 +248,8 @@ end
 code/await Nrf24l01_Write (var& Nrf24l01_ nrf, var byte reg, var byte value) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            var byte status = await SPI_Transfer(W_REGISTER | (REGISTER_MASK & reg));
-            await SPI_Transfer(value);
+            var byte status = await SPI_Transfer_8(W_REGISTER | (REGISTER_MASK & reg));
+            await SPI_Transfer_8(value);
             escape status;
         end
     end
@@ -255,10 +258,10 @@ end
 code/await Nrf24l01_Writes (var& Nrf24l01_ nrf, var byte reg, var&[] byte values) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            var byte status = await SPI_Transfer(W_REGISTER | (REGISTER_MASK & reg));
+            var byte status = await SPI_Transfer_8(W_REGISTER | (REGISTER_MASK & reg));
             var usize i;
             loop i in [0 -> $values[ do
-                await SPI_Transfer(values[i]);
+                await SPI_Transfer_8(values[i]);
             end
             escape status;
         end
@@ -268,11 +271,11 @@ end
 code/await Nrf24l01_Read (var& Nrf24l01_ nrf, var byte reg) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            var byte status = await SPI_Transfer(R_REGISTER | (REGISTER_MASK & reg));
+            var byte status = await SPI_Transfer_8(R_REGISTER | (REGISTER_MASK & reg));
             if reg == STATUS then
                 escape status;
             end
-            var byte v = await SPI_Transfer(0xFF);
+            var byte v = await SPI_Transfer_8(0xFF);
             escape v;
         end
     end
@@ -311,10 +314,10 @@ do
     // flush buffers
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            await SPI_Transfer(FLUSH_RX);
+            await SPI_Transfer_8(FLUSH_RX);
         end
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            await SPI_Transfer(FLUSH_TX);
+            await SPI_Transfer_8(FLUSH_TX);
         end
     end
 
@@ -340,16 +343,13 @@ do
         _digitalWrite(nrf.ce, 0);
     end
 
-    do
-        var int pin;
-        (pin,_) = await PIN_IN until pin==nrf.irq;
-    end
+    await NRF24L01_IRQ;
 
     // read status for receiving pipe
     var u8 pipe = do
         lock nrf.spi do
             watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-                var byte v = await SPI_Transfer(0xFF);
+                var byte v = await SPI_Transfer_8(0xFF);
                 escape v as u8;
             end
         end
@@ -358,10 +358,10 @@ do
 
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            await SPI_Transfer(R_RX_PAYLOAD);
+            await SPI_Transfer_8(R_RX_PAYLOAD);
             var usize i;
             loop i in [0 -> $$buf[ do
-                var byte v = await SPI_Transfer(0xFF);
+                var byte v = await SPI_Transfer_8(0xFF);
                 buf = buf .. [v];
             end
         end
@@ -376,22 +376,19 @@ code/await Nrf24l01_TX (var& Nrf24l01_ nrf, var&[] byte buf) -> bool
 do
     await Nrf24l01_Write(&nrf, STATUS, _bit(RX_DR) | _bit(TX_DS) | _bit(MAX_RT));
 
-    par/or do
-        var int pin;
-        (pin,_) = await PIN_IN until pin==nrf.irq;
-    with
+    watching NRF24L01_IRQ do
         await Nrf24l01_Write(&nrf, CONFIG, nrf.config | _bit(MASK_RX_DR));
         lock nrf.spi do
             watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-                await SPI_Transfer(W_TX_PAYLOAD);
+                await SPI_Transfer_8(W_TX_PAYLOAD);
                 var usize i;
                 loop i in [0 -> $buf[ do
-                    await SPI_Transfer(buf[i]);
+                    await SPI_Transfer_8(buf[i]);
                 end
 #if 1
                 // needed for non-dynamic payloads
                 loop i in [$buf -> $$buf[ do
-                    await SPI_Transfer(0);
+                    await SPI_Transfer_8(0);
                 end
 #endif
             end
