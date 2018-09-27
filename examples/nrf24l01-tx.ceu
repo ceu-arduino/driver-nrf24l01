@@ -23,5 +23,5 @@ loop i do
     await 1s;
     var[1] byte buf = [i];
     await NRF24L01_Tx(&nrf, &buf);
-    {Serial.print("< "); Serial.println(@buf[0]); _DELAY(10);}
+    {Serial.print("< "); Serial.println(@i); _DELAY(10);}
 end

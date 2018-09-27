@@ -34,7 +34,7 @@ loop i do
             await NRF24L01_Tx(&nrf, &buf);
 
             str = [] .. "< ";
-            call String_Append_INT(&str, buf[0], _);
+            call String_Append_INT(&str, i, _);
             call String_Append_STR(&str, "\n\r");
             await USART_Tx(&str);
             //{Serial.print("< "); Serial.println(@buf[0]); _DELAY(10);}
