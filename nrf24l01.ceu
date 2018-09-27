@@ -248,9 +248,9 @@ end
 code/await NRF24L01_Write (var& NRF24L01_Data nrf, var byte reg, var byte value) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            var byte status = await SPI_Transfer_8(W_REGISTER | (REGISTER_MASK & reg));
-            await SPI_Transfer_8(value);
-            escape status;
+            var[2] byte vs = [ (W_REGISTER | (REGISTER_MASK & reg)), value ];
+            await SPI_Transfer(&vs);
+            escape vs[0];
         end
     end
 end
@@ -259,10 +259,7 @@ code/await NRF24L01_Writes (var& NRF24L01_Data nrf, var byte reg, var&[] byte va
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
             var byte status = await SPI_Transfer_8(W_REGISTER | (REGISTER_MASK & reg));
-            var usize i;
-            loop i in [0 -> $values[ do
-                await SPI_Transfer_8(values[i]);
-            end
+            await SPI_Transfer(&values);
             escape status;
         end
     end
@@ -271,12 +268,9 @@ end
 code/await NRF24L01_Read (var& NRF24L01_Data nrf, var byte reg) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
-            var byte status = await SPI_Transfer_8(R_REGISTER | (REGISTER_MASK & reg));
-            if reg == STATUS then
-                escape status;
-            end
-            var byte v = await SPI_Transfer_8(0xFF);
-            escape v;
+            var[2] byte vs = [ (R_REGISTER | (REGISTER_MASK & reg)), 0xFF ];
+            await SPI_Transfer(&vs);
+            escape vs[1];
         end
     end
 end
@@ -299,11 +293,16 @@ do
     await NRF24L01_Write(&nrf, RF_SETUP, _bit(RF_DR_LOW)|_bit(RF_DR_HIGH)|_bit(RF_PWR_LOW)|_bit(RF_PWR_HIGH));
 
     // set pipe addresses, lengths
-    var[5] byte addr = [0xEE, 0xDD, 0xCC, 0xBB, 0xAA];
-    await NRF24L01_Write (&nrf, EN_RXADDR,  _bit(ERX_P0));  // enables RX0 pipe
-    await NRF24L01_Writes(&nrf, RX_ADDR_P0, &addr);         // RX0 address
-    await NRF24L01_Write (&nrf, RX_PW_P0,   1);             // RX0 payload length
-    await NRF24L01_Writes(&nrf, TX_ADDR,    &addr);         // TX address
+    await NRF24L01_Write(&nrf, EN_RXADDR, _bit(ERX_P0));    // enables RX0 pipe
+    do
+        var[5] byte addr = [0xEE, 0xDD, 0xCC, 0xBB, 0xAA];
+        await NRF24L01_Writes(&nrf, RX_ADDR_P0, &addr);     // RX0 address
+    end
+    await NRF24L01_Write(&nrf, RX_PW_P0, 1);                // RX0 payload length
+    do
+        var[5] byte addr = [0xEE, 0xDD, 0xCC, 0xBB, 0xAA];
+        await NRF24L01_Writes(&nrf, TX_ADDR, &addr);        // TX address
+    end
 
     // ACK=no
     await NRF24L01_Write(&nrf, EN_AA, 0);
@@ -361,9 +360,9 @@ do
             await SPI_Transfer_8(R_RX_PAYLOAD);
             var usize i;
             loop i in [0 -> $$buf[ do
-                var byte v = await SPI_Transfer_8(0xFF);
-                buf = buf .. [v];
+                buf = buf .. [0xFF];
             end
+            await SPI_Transfer(&buf);
         end
     end
 
@@ -382,15 +381,13 @@ do
             watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
                 await SPI_Transfer_8(W_TX_PAYLOAD);
                 var usize i;
-                loop i in [0 -> $buf[ do
-                    await SPI_Transfer_8(buf[i]);
-                end
 #if 1
                 // needed for non-dynamic payloads
                 loop i in [$buf -> $$buf[ do
-                    await SPI_Transfer_8(0);
+                    buf = buf .. [0];
                 end
 #endif
+                await SPI_Transfer(&buf);
             end
         end
 
