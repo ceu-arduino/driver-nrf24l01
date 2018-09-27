@@ -6,7 +6,7 @@
 #error Missing interrupt pin `NRF24L01_IRQ`.
 #endif
 
-data Nrf24l01_ with
+data NRF24L01_Data with
     var&   Lock spi;
     var    int  ce;
     var    int  csn;
@@ -20,9 +20,9 @@ data Nrf24l01_ with
     event  none max;
 end
 
-code/await Nrf24l01    (var& Nrf24l01_ nrf)             -> NEVER;
-code/await Nrf24l01_RX (var& Nrf24l01_ nrf, var&[] byte buf) -> u8;
-code/await Nrf24l01_TX (var& Nrf24l01_ nrf, var&[] byte buf) -> bool;
+code/await NRF24L01_Init (var& NRF24L01_Data nrf)                  -> NEVER;
+code/await NRF24L01_Rx   (var& NRF24L01_Data nrf, var&[] byte buf) -> u8;
+code/await NRF24L01_Tx   (var& NRF24L01_Data nrf, var&[] byte buf) -> bool;
 
 ///////////////////////////////////////////////////////////////////////////////
 // DOCUMENTATION
@@ -245,7 +245,7 @@ end
 
 #include "wclock.ceu"
 
-code/await Nrf24l01_Write (var& Nrf24l01_ nrf, var byte reg, var byte value) -> byte do
+code/await NRF24L01_Write (var& NRF24L01_Data nrf, var byte reg, var byte value) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
             var byte status = await SPI_Transfer_8(W_REGISTER | (REGISTER_MASK & reg));
@@ -255,7 +255,7 @@ code/await Nrf24l01_Write (var& Nrf24l01_ nrf, var byte reg, var byte value) -> 
     end
 end
 
-code/await Nrf24l01_Writes (var& Nrf24l01_ nrf, var byte reg, var&[] byte values) -> byte do
+code/await NRF24L01_Writes (var& NRF24L01_Data nrf, var byte reg, var&[] byte values) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
             var byte status = await SPI_Transfer_8(W_REGISTER | (REGISTER_MASK & reg));
@@ -268,7 +268,7 @@ code/await Nrf24l01_Writes (var& Nrf24l01_ nrf, var byte reg, var&[] byte values
     end
 end
 
-code/await Nrf24l01_Read (var& Nrf24l01_ nrf, var byte reg) -> byte do
+code/await NRF24L01_Read (var& NRF24L01_Data nrf, var byte reg) -> byte do
     lock nrf.spi do
         watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
             var byte status = await SPI_Transfer_8(R_REGISTER | (REGISTER_MASK & reg));
@@ -281,7 +281,7 @@ code/await Nrf24l01_Read (var& Nrf24l01_ nrf, var byte reg) -> byte do
     end
 end
 
-code/await Nrf24l01 (var& Nrf24l01_ nrf) -> NEVER
+code/await NRF24L01_Init (var& NRF24L01_Data nrf) -> NEVER
 do
     _pinMode(nrf.ce,  _OUTPUT);
     _pinMode(nrf.csn, _OUTPUT);
@@ -291,25 +291,25 @@ do
     await 5ms;  // see RF24 library
 
     // set RF channel (76???)
-    await Nrf24l01_Write(&nrf, RF_CH, 76);
+    await NRF24L01_Write(&nrf, RF_CH, 76);
 
     // RF24_2MBPS, 0dBm
-    //await Nrf24l01_Write(&nrf, RF_SETUP, _bit(RF_DR_HIGH)|_bit(RF_PWR_LOW)|_bit(RF_PWR_HIGH));
+    //await NRF24L01_Write(&nrf, RF_SETUP, _bit(RF_DR_HIGH)|_bit(RF_PWR_LOW)|_bit(RF_PWR_HIGH));
     // 1MBPS
-    await Nrf24l01_Write(&nrf, RF_SETUP, _bit(RF_DR_LOW)|_bit(RF_DR_HIGH)|_bit(RF_PWR_LOW)|_bit(RF_PWR_HIGH));
+    await NRF24L01_Write(&nrf, RF_SETUP, _bit(RF_DR_LOW)|_bit(RF_DR_HIGH)|_bit(RF_PWR_LOW)|_bit(RF_PWR_HIGH));
 
     // set pipe addresses, lengths
     var[5] byte addr = [0xEE, 0xDD, 0xCC, 0xBB, 0xAA];
-    await Nrf24l01_Write (&nrf, EN_RXADDR,  _bit(ERX_P0));  // enables RX0 pipe
-    await Nrf24l01_Writes(&nrf, RX_ADDR_P0, &addr);         // RX0 address
-    await Nrf24l01_Write (&nrf, RX_PW_P0,   1);             // RX0 payload length
-    await Nrf24l01_Writes(&nrf, TX_ADDR,    &addr);         // TX address
+    await NRF24L01_Write (&nrf, EN_RXADDR,  _bit(ERX_P0));  // enables RX0 pipe
+    await NRF24L01_Writes(&nrf, RX_ADDR_P0, &addr);         // RX0 address
+    await NRF24L01_Write (&nrf, RX_PW_P0,   1);             // RX0 payload length
+    await NRF24L01_Writes(&nrf, TX_ADDR,    &addr);         // TX address
 
     // ACK=no
-    await Nrf24l01_Write(&nrf, EN_AA, 0);
+    await NRF24L01_Write(&nrf, EN_AA, 0);
 
     // clears ISRs
-    await Nrf24l01_Write(&nrf, STATUS, _bit(RX_DR)|_bit(TX_DS)|_bit(MAX_RT));
+    await NRF24L01_Write(&nrf, STATUS, _bit(RX_DR)|_bit(TX_DS)|_bit(MAX_RT));
 
     // flush buffers
     lock nrf.spi do
@@ -324,7 +324,7 @@ do
     // CRC = 2 bytes
     // POWER UP (TODO: finalize power down)
     nrf.config = (_bit(PWR_UP) | _bit(EN_CRC) | _bit(CRCO));
-    await Nrf24l01_Write(&nrf, CONFIG, nrf.config);
+    await NRF24L01_Write(&nrf, CONFIG, nrf.config);
     spawn do
         await 150ms;    // power up
         emit nrf.ok;
@@ -333,10 +333,10 @@ do
     await FOREVER;
 end
 
-code/await Nrf24l01_RX (var& Nrf24l01_ nrf, var&[] byte buf) -> u8
+code/await NRF24L01_Rx (var& NRF24L01_Data nrf, var&[] byte buf) -> u8
 do
-    await Nrf24l01_Write(&nrf, STATUS, _bit(RX_DR) | _bit(TX_DS) | _bit(MAX_RT));
-    await Nrf24l01_Write(&nrf, CONFIG, nrf.config | _bit(PRIM_RX) | _bit(MASK_TX_DS) | _bit(MASK_MAX_RT));
+    await NRF24L01_Write(&nrf, STATUS, _bit(RX_DR) | _bit(TX_DS) | _bit(MAX_RT));
+    await NRF24L01_Write(&nrf, CONFIG, nrf.config | _bit(PRIM_RX) | _bit(MASK_TX_DS) | _bit(MASK_MAX_RT));
 
     _digitalWrite(nrf.ce, 1);
     do finalize with
@@ -367,17 +367,17 @@ do
         end
     end
 
-    await Nrf24l01_Write(&nrf, STATUS, _bit(RX_DR));
+    await NRF24L01_Write(&nrf, STATUS, _bit(RX_DR));
 
     escape pipe;
 end
 
-code/await Nrf24l01_TX (var& Nrf24l01_ nrf, var&[] byte buf) -> bool
+code/await NRF24L01_Tx (var& NRF24L01_Data nrf, var&[] byte buf) -> bool
 do
-    await Nrf24l01_Write(&nrf, STATUS, _bit(RX_DR) | _bit(TX_DS) | _bit(MAX_RT));
+    await NRF24L01_Write(&nrf, STATUS, _bit(RX_DR) | _bit(TX_DS) | _bit(MAX_RT));
 
     watching NRF24L01_IRQ do
-        await Nrf24l01_Write(&nrf, CONFIG, nrf.config | _bit(MASK_RX_DR));
+        await NRF24L01_Write(&nrf, CONFIG, nrf.config | _bit(MASK_RX_DR));
         lock nrf.spi do
             watching SPI_Transaction(4000000, SPI_MSBFIRST, SPI_MODE0, _, nrf.csn) do
                 await SPI_Transfer_8(W_TX_PAYLOAD);
@@ -410,7 +410,7 @@ do
 
     // ISR -> event
     var bool ret = do
-        var byte status = await Nrf24l01_Read(&nrf, STATUS);
+        var byte status = await NRF24L01_Read(&nrf, STATUS);
         if _bitRead(status, {TX_DS}) as bool then
             escape true;
         else/if _bitRead(status, {MAX_RT}) as bool then
@@ -421,19 +421,19 @@ _ceu_arduino_assert(0, 4);
         end
     end;
 
-    await Nrf24l01_Write(&nrf, STATUS, _bit(TX_DS) | _bit(MAX_RT));
+    await NRF24L01_Write(&nrf, STATUS, _bit(TX_DS) | _bit(MAX_RT));
 
     escape ret;
 end
 
-code/await Nrf24l01_Set_Channel (var& Nrf24l01_ nrf, var u8 channel) -> none do
+code/await NRF24L01_Set_Channel (var& NRF24L01_Data nrf, var u8 channel) -> none do
     _ceu_assert(channel <= 125, "invalid channel");
-    await Nrf24l01_Write(&nrf, RF_CH, channel as byte);
+    await NRF24L01_Write(&nrf, RF_CH, channel as byte);
 end
 
-#define Nrf24l01_IDX(i) {(((byte*) &@(address))[i])}
+#define NRF24L01_IDX(i) {(((byte*) &@(address))[i])}
 
-code/await Nrf24l01_Open_Reading_Pipe (var& Nrf24l01_ nrf, var u8 pipe, var u64 address) -> none do
+code/await NRF24L01_Open_Reading_Pipe (var& NRF24L01_Data nrf, var u8 pipe, var u64 address) -> none do
     _ceu_assert(pipe < 6, "invalid pipe");
 
     // If this is pipe 0, cache the address.  This is needed because
@@ -445,35 +445,35 @@ code/await Nrf24l01_Open_Reading_Pipe (var& Nrf24l01_ nrf, var u8 pipe, var u64 
 
     // For pipes 2-5, only write the LSB
     if pipe < 2 then
-        var[5] byte address_ = [Nrf24l01_IDX(0), Nrf24l01_IDX(1), Nrf24l01_IDX(2), Nrf24l01_IDX(3), Nrf24l01_IDX(4)];
-        await Nrf24l01_Writes(&nrf, {pgm_read_byte(&child_pipe[@pipe])}, &address_);
+        var[5] byte address_ = [NRF24L01_IDX(0), NRF24L01_IDX(1), NRF24L01_IDX(2), NRF24L01_IDX(3), NRF24L01_IDX(4)];
+        await NRF24L01_Writes(&nrf, {pgm_read_byte(&child_pipe[@pipe])}, &address_);
     else
-        await Nrf24l01_Write(&nrf, {pgm_read_byte(&child_pipe[@pipe])}, Nrf24l01_IDX(0));
+        await NRF24L01_Write(&nrf, {pgm_read_byte(&child_pipe[@pipe])}, NRF24L01_IDX(0));
     end
 
-    await Nrf24l01_Write(&nrf, {pgm_read_byte(&child_payload_size[@pipe])}, nrf.payload_size as byte);
+    await NRF24L01_Write(&nrf, {pgm_read_byte(&child_payload_size[@pipe])}, nrf.payload_size as byte);
 
     // Note it would be more efficient to set all of the bits for all open
     // pipes at once.  However, I thought it would make the calling code
     // more simple to do it this way.
-    var byte en_rxaddr = await Nrf24l01_Read(&nrf, EN_RXADDR);
-    await Nrf24l01_Write(&nrf, EN_RXADDR, en_rxaddr | {_BV(pgm_read_byte(&child_pipe_enable[@pipe]))});
+    var byte en_rxaddr = await NRF24L01_Read(&nrf, EN_RXADDR);
+    await NRF24L01_Write(&nrf, EN_RXADDR, en_rxaddr | {_BV(pgm_read_byte(&child_pipe_enable[@pipe]))});
 end
 
-code/await Nrf24l01_Open_Writing_Pipe (var& Nrf24l01_ nrf, var u64 address) -> none do
-    var[5] byte address_ = [Nrf24l01_IDX(0), Nrf24l01_IDX(1), Nrf24l01_IDX(2), Nrf24l01_IDX(3), Nrf24l01_IDX(4)];
-    await Nrf24l01_Writes(&nrf, RX_ADDR_P0, &address_);
-    await Nrf24l01_Writes(&nrf, TX_ADDR,    &address_);
-    await Nrf24l01_Write(&nrf, RX_PW_P0, nrf.payload_size as byte);
+code/await NRF24L01_Open_Writing_Pipe (var& NRF24L01_Data nrf, var u64 address) -> none do
+    var[5] byte address_ = [NRF24L01_IDX(0), NRF24L01_IDX(1), NRF24L01_IDX(2), NRF24L01_IDX(3), NRF24L01_IDX(4)];
+    await NRF24L01_Writes(&nrf, RX_ADDR_P0, &address_);
+    await NRF24L01_Writes(&nrf, TX_ADDR,    &address_);
+    await NRF24L01_Write(&nrf, RX_PW_P0, nrf.payload_size as byte);
 end
 
-code/await Nrf24l01_Set_Auto_Ack (var& Nrf24l01_ nrf, var u8 pipe, var bool enable) -> none do
+code/await NRF24L01_Set_Auto_Ack (var& NRF24L01_Data nrf, var u8 pipe, var bool enable) -> none do
     _ceu_assert(pipe < 6, "invalid pipe");
-    var byte en_aa = await Nrf24l01_Read(&nrf, EN_AA);
+    var byte en_aa = await NRF24L01_Read(&nrf, EN_AA);
     if enable then
         en_aa = en_aa | _bit(pipe);
     else
         en_aa = en_aa & ~_bit(pipe);
     end
-    await Nrf24l01_Write(&nrf, EN_AA, en_aa);
+    await NRF24L01_Write(&nrf, EN_AA, en_aa);
 end

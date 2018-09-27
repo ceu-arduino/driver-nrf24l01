@@ -18,8 +18,8 @@ await USART_Tx(&str);
 
 var Lock spi = _;
 
-var Nrf24l01_ nrf = val Nrf24l01_(&spi, 8,7, _,_,_,_,_,_,_);
-spawn Nrf24l01(&nrf);
+var NRF24L01_Data nrf = val NRF24L01_Data(&spi, 8,7, _,_,_,_,_,_,_);
+spawn NRF24L01_Init(&nrf);
 await nrf.ok;
 
 output high/low PIN_13;
@@ -31,7 +31,7 @@ loop i do
         emit PIN_13(((i+1) % 2) as high/low);
         do
             var[1] byte buf = [i];
-            await Nrf24l01_TX(&nrf, &buf);
+            await NRF24L01_Tx(&nrf, &buf);
 
             str = [] .. "< ";
             call String_Append_INT(&str, buf[0], _);
@@ -41,7 +41,7 @@ loop i do
         end
         do
             var[1] byte buf = [];
-            await Nrf24l01_RX(&nrf, &buf);
+            await NRF24L01_Rx(&nrf, &buf);
 
             str = [] .. "> ";
             call String_Append_INT(&str, buf[0], _);
