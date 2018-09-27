@@ -1,4 +1,3 @@
-#include "wdt.ceu"
 #include "int0.ceu"
 #include "spi.ceu"
 
@@ -15,11 +14,8 @@ var NRF24L01_Data nrf = val NRF24L01_Data(&spi, 8,7, _,_,_,_,_,_,_);
 spawn NRF24L01_Init(&nrf);
 await nrf.ok;
 
-output high/low PIN_13;
-
 var int i;
 loop i do
-    emit PIN_13(((i+1) % 2) as high/low);
     await 1s;
     var[1] byte buf = [i];
     await NRF24L01_Tx(&nrf, &buf);
