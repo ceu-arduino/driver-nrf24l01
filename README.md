@@ -8,6 +8,16 @@
 #include "nrf24l01.ceu"
 ```
 
+### Macros
+
+#### NRF24L01_IRQ
+
+Sets the input event for radio interrupts.
+
+```
+#define NRF24L01_IRQ <fill-with-input-pin>
+```
+
 ### Data Abstractions
 
 #### NRF24L01_Data
