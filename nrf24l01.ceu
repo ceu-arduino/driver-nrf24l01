@@ -334,6 +334,7 @@ end
 
 code/await NRF24L01_Rx (var& NRF24L01_Data nrf, var&[] byte buf) -> u8
 do
+    await NRF24L01_Write(&nrf, RX_PW_P0, $$buf as byte);
     await NRF24L01_Write(&nrf, STATUS, _bit(RX_DR) | _bit(TX_DS) | _bit(MAX_RT));
     await NRF24L01_Write(&nrf, CONFIG, nrf.config | _bit(PRIM_RX) | _bit(MASK_TX_DS) | _bit(MASK_MAX_RT));
 
