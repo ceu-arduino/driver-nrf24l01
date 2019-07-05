@@ -72,7 +72,7 @@ The maximum size of the buffer indicates the number of bytes to receive.
 
 #### NRF24L01_Tx
 
-Transmits data in the given buffer.
+Transmits data in the given buffer. The data received from the transceiver is stored in the buffer in-place (the old data is replaced with the data received).
 
 ```
 code/await NRF24L01_Tx (var& NRF24L01_Data nrf, var&[] byte buf) -> bool;
